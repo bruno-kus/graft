@@ -371,7 +371,7 @@ void test_acyclic_patch()
 
     auto album_2_ptr = graph.create<Album>("Extra Album", 2000);
 
-    auto disc1_ptr = graph.create<Disc>(1); // tego nie chcę!
+    auto disc1_ptr = graph.create<Disc>(1);
     auto disc2_ptr = graph.create<Disc>(2);
 
     auto track1_1_ptr = graph.create<Track>("Love's In Need Of Love Today");

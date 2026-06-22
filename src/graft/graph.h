@@ -8,24 +8,60 @@
 
 namespace graft
 {
-    template<template<class> class p_object_template, class... metaclasses>
+    template<class object_type>
+    struct object_storage
+    {
+        std::vector<std::shared_ptr<object_type>> m_objects;
+
+        auto store(std::shared_ptr<object_type> object_ptr) -> void
+        {
+            m_objects.emplace_back(std::move(object_ptr));
+        }
+
+        auto find(const object_type& object) -> const std::shared_ptr<object_type>&
+        {
+            auto it = std::ranges::find(m_objects, &object, &std::shared_ptr<object_type>::get);
+            if (it == m_objects.end()) { throw std::runtime_error{""}; }
+            return *it;
+        }
+
+        friend auto operator<<(std::ostream& os, const object_storage& object_storage) -> std::ostream&
+        {
+            constexpr auto metaclass_name = object_type::metaclass::metaclass_name;
+            os << "<" << metaclass_name << ">";
+            os << "{";
+            if (not object_storage.m_objects.empty())
+            {
+                os << *object_storage.m_objects.front();
+                if (object_storage.m_objects.size() > 1)
+                {
+                    for (const auto& object_ptr : object_storage.m_objects | std::views::drop(1))
+                    {
+                        os << ", " << *object_ptr;
+                    }
+                }
+            }
+            os << "}";
+            return os;
+        }
+    };
+    /*
+     * jeżeli mam neighbour object template oraz object_template, czy mogę być tym samym
+     */
+    template<template<class> class object_template_arg, class... metaclasses>
     struct graph
     {
-
         template<class T>
-        using object_template = p_object_template<T>;
+        using object_template = object_template_arg<T>;
 
         using metaclasses_tuple = std::tuple<metaclasses...>;
 
-        template<class T>
-        using object = object_template<T>;
-
-        std::tuple<object_storage<object<metaclasses>>...> m_storages;
+        std::tuple<object_storage<object_template_arg<metaclasses>>...> m_storages;
 
         template<class metaclass>
-        auto get_storage() -> object_storage<object<metaclass>>&
+        auto get_storage() -> object_storage<object_template_arg<metaclass>>&
         {
-            return std::get<object_storage<object<metaclass>>>(m_storages);
+            return std::get<object_storage<object_template_arg<metaclass>>>(m_storages);
         }
 
         friend std::hash<graph>;
@@ -38,7 +74,7 @@ namespace graft
                 using non_associators = tuple_remove_if_t
                 <
                     typename object_metaclass::members,
-                    []<class T> { return associator<T>; }
+                    []<class T> { return some_associator<T>; }
                 >;
                 return [&object]<std::size_t... non_associator_indices>(std::index_sequence<non_associator_indices...>)
                 {
@@ -70,7 +106,7 @@ namespace graft
                             using associators = tuple_remove_if_t
                             <
                                 typename object_1_metaclass::members,
-                                []<class T> { return not associator<T>; }
+                                []<class T> { return not some_associator<T>; }
                             >;
 
                             const auto& object_ptr_2 = *it;
@@ -143,7 +179,7 @@ namespace graft
         // requires (std::is_same_v<metaclass, metaclasses> || ...)
         auto create(auto&&... args)
         {
-            auto object_ptr = std::make_shared<object<metaclass>>(std::forward<decltype(args)>(args)...);
+            auto object_ptr = std::make_shared<object_template_arg<metaclass>>(std::forward<decltype(args)>(args)...);
 
             get_storage<metaclass>().store(object_ptr);
 
@@ -190,11 +226,11 @@ namespace graft
 
     };
 }
-template<class... metaclasses>
-struct std::hash<graft::object<metaclasses...>>
-{
-    auto operator()(const graft::object<metaclasses...>& object) const noexcept -> std::size_t
-    {
-        return 0;
-    }
-};
+// template<class... metaclasses>
+// struct std::hash<graft::object<metaclasses...>>
+// {
+//     auto operator()(const graft::object<metaclasses...>& object) const noexcept -> std::size_t
+//     {
+//         return 0;
+//     }
+// };

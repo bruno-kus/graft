@@ -276,7 +276,7 @@ namespace graft
         }
 
         auto set(const auto member, auto&& value) -> void
-        requires (associator<std::remove_cvref_t<decltype(member)>>)
+        requires (some_associator<std::remove_cvref_t<decltype(member)>>)
         {
             m_cache.set(member, std::forward<decltype(value)>(value));
         }
@@ -296,7 +296,7 @@ namespace graft
                 {
                     using current_member = std::tuple_element_t<member_index, typename metaclass::members>;
 
-                    if constexpr(associator<current_member>)
+                    if constexpr(some_associator<current_member>)
                     {
                         using member_neighbour_metaclass = typename current_member::value_type::neighbour_metaclass; // domenowa metaklasa sąsiada
                         if constexpr (std::is_same_v<typename std::remove_cvref_t<decltype(supposed_neighbour)>::metaclass::source_metaclass, member_neighbour_metaclass>)
@@ -331,7 +331,7 @@ namespace graft
                 if constexpr (member_holder_index == std::tuple_size_v<typename decltype(m_cache)::member_holders_type>) { static_assert(false); }
                 else
                 {
-                    if constexpr(associator<std::tuple_element_t<member_holder_index, typename metaclass::members>>)
+                    if constexpr(some_associator<std::tuple_element_t<member_holder_index, typename metaclass::members>>)
                     {
                         using associator = typename std::tuple_element_t<member_holder_index, typename metaclass::members>;
                         if constexpr

@@ -1,6 +1,6 @@
-#include "../graft/many.h"
-#include "../graft/graft.h"
-#include "../graft/one.h"
+#include "../graft/associator/many.h"
+#include "../graft/member.h"
+#include "../graft/associator/one.h"
 
 struct DiscNumberedTrack;
 struct AlbumNumberedTrack;

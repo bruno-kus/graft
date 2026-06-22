@@ -159,7 +159,7 @@ namespace graft::detail
     template<some_member member, template<class> class object_template>
     using to_holder_t =  decltype([]
     {
-        if constexpr (associator<member>)
+        if constexpr (some_associator<member>)
         {
             return std::type_identity<typename member::template holder<object_template>>{};
         }

@@ -1,4 +1,6 @@
-#include "../graft/graft.h"
+#include "../graft/member.h"
+
+#include "../graft/associator/many.h"
 
 struct Album;
 

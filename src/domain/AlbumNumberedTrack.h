@@ -1,6 +1,6 @@
-#include "../graft/many.h"
-#include "../graft/one.h"
-#include "../graft/graft.h"
+#include "../graft/associator/many.h"
+#include "../graft/associator/one.h"
+#include "../graft/member.h"
 
 struct Track;
 struct Album;

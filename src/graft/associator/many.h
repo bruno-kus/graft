@@ -1,4 +1,6 @@
 #pragma once
+#include <vector>
+#include <memory>
 namespace graft
 {
     template <class some_type>

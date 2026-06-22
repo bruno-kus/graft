@@ -1,5 +1,5 @@
-#include "../graft/many.h"
-#include "../graft/graft.h"
+#include "../graft/associator/many.h"
+#include "../graft/member.h"
 
 struct DiscNumberedTrack;
 struct Album;

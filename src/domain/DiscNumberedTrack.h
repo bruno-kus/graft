@@ -1,4 +1,5 @@
-#include "../graft/one.h"
+#include "../graft/associator/one.h"
+#include "../graft/member.h"
 
 struct Disc;
 struct Track;
