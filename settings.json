@@ -1,0 +1,7 @@
+{
+  "languages": {
+    "C++": {
+      "diagnostics_max_severity": "off"
+    }
+  }
+}
