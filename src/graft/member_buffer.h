@@ -96,7 +96,7 @@ namespace graft
                         {
                             for (const auto& existing_neighbour : std::get<member_index>(member_holders))
                             {
-                            if (existing_neighbour.get() == &supposed_neighbour)
+                            if ((void*)existing_neighbour.get() == (void*)&supposed_neighbour)
                             {
                                 return true;
                             }

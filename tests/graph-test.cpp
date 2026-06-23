@@ -7,7 +7,7 @@
 
 TEST_CASE("graft::graft<graft::object, ...>")
 {
-    using Graph = graft::graph<graft::object, Artist, Album, AlbumNumberedTrack, Disc, DiscNumberedTrack, Track>;
+    using Graph = graft::graph<graft::object, std::type_identity_t, Artist, Album, AlbumNumberedTrack, Disc, DiscNumberedTrack, Track>;
     Graph graph;
 
 

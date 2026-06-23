@@ -48,7 +48,23 @@ namespace graft
 
 
 
+    auto shallow_clone(auto& new_graph, auto& object) -> decltype(auto)
+    {
+        using object_metaclass = typename std::remove_cvref_t<decltype(object)>::metaclass;
+        // muszę wszystkie atrybuty pobrać...
+        using effective_target_metaclass = decltype(new_graph.template create<object_metaclass>())::element_type::metaclass;
 
+        using non_associators = tuple_remove_if_t
+        <
+            typename effective_target_metaclass::members,
+            []<class T> { return some_associator<T>; }
+        >;
+
+        return [&object, &new_graph]<std::size_t... non_associator_indices>(std::index_sequence<non_associator_indices...>)
+        {
+            return new_graph.template create<object_metaclass>(object.get(std::tuple_element_t<non_associator_indices, non_associators>{})...);
+        }(std::make_index_sequence<std::tuple_size_v<non_associators>>());
+    }
 
     template<class root_metaclass>
     consteval auto compute_member_blacklist_size() -> std::size_t
@@ -179,11 +195,12 @@ namespace graft
                     using neighbour_metaclass = typename current_associator::value_type::neighbour_metaclass;
 
                     constexpr bool current_associator_neighbour_metaclass_same_as_previous_metaclass = std::is_same_v<typename current_associator::value_type::neighbour_metaclass, previous_metaclass>;
-                    constexpr bool current_associator_arity_many = requires { typename current_associator::value_type::arity_many; }; // PODEJRZANE
+                    constexpr bool current_associator_arity_many = requires { typename current_associator::value_type::arity_many; };
                     if constexpr (current_associator_neighbour_metaclass_same_as_previous_metaclass and current_associator_arity_many)
                     {
                         result.at(result_back) = member_location{.metaclass_index = tuple_find_v<metaclasses_tuple, current_metaclass>, .member_index=tuple_find_v<typename current_metaclass::members, current_associator> };
                         ++result_back;
+                        return traverse_associator.template operator()<associator_index + 1>();
                     }
 
                     if (not is_edge_traversed(traversed, current_metaclass::metaclass_name, neighbour_metaclass::metaclass_name))
@@ -247,10 +264,10 @@ namespace graft
 
     //     }())::type;
 
-    template<template<class> class object_template_arg, class metaclasses_tuple, class root_metaclass>
+    template<template<class, template<class> class> class object_template_arg, class metaclasses_tuple, class root_metaclass>
     struct reachable_acyclic_object_template
     {
-        template<class nominal_metaclass>
+        template<class nominal_metaclass, template<class>class neighbour_effective_metaclass_template>
         using object_template = decltype
             ([]{
                 using effective_metaclasses = make_reachable_acyclic_patch_adhoc_metaclasses_t
@@ -260,10 +277,26 @@ namespace graft
                     >;
                 constexpr auto effective_metaclass_index = tuple_find_if_v
                     <
-                        metaclasses_tuple,
+                        effective_metaclasses,
                         []<class effective_metaclass> { return effective_metaclass::metaclass_name == nominal_metaclass::metaclass_name; }
                     >;
-                return std::type_identity<object_template_arg<std::tuple_element_t<effective_metaclass_index, effective_metaclasses>>>{};
+                return std::type_identity<object_template_arg<std::tuple_element_t<effective_metaclass_index, effective_metaclasses>, neighbour_effective_metaclass_template>>{};
+            }())::type;
+
+        template<class nominal_metaclass>
+        using neighbour_effective_metaclass_template = decltype
+            ([]{
+                using effective_metaclasses = make_reachable_acyclic_patch_adhoc_metaclasses_t
+                    <
+                        metaclasses_tuple,
+                        root_metaclass
+                    >;
+                constexpr auto effective_metaclass_index = tuple_find_if_v
+                    <
+                        effective_metaclasses,
+                        []<class effective_metaclass> { return effective_metaclass::metaclass_name == nominal_metaclass::metaclass_name; }
+                    >;
+                return std::type_identity<std::tuple_element_t<effective_metaclass_index, effective_metaclasses>>{};
             }())::type;
     };
 
@@ -272,13 +305,21 @@ namespace graft
     // using reachable_acyclic_object_template = reachable_acyclic_effective_metaclass<object_template, metaclasses_tuple, root_metaclass>;
 
 
-    template<template<template<class> class, class...> class graph_template, template<class> class object_template>
+    template<template<template<class, template<class> class> class, template<class> class, class...> class graph_template, template<class, template<class>class> class object_template>
     auto make_reachable_acyclic_copy(const auto& source_graph, auto& root_object_ptr)
     {
         using source_graph_type = std::remove_cvref_t<decltype(source_graph)>;
         using root_object_metaclass = typename std::remove_cvref_t<decltype(root_object_ptr)>::element_type::metaclass;
 
         using adhoc = make_reachable_acyclic_patch_adhoc_metaclasses_t<typename source_graph_type::metaclasses_tuple, root_object_metaclass>;
+
+
+        using x = reachable_acyclic_object_template
+            <
+                object_template,
+                typename source_graph_type::metaclasses_tuple,
+                root_object_metaclass // effective czy nominal? // todo
+            >;
 
         using target_graph_type = decltype
             ([]<std::size_t... Is>(std::index_sequence<Is...>){
@@ -292,6 +333,7 @@ namespace graft
                                     typename source_graph_type::metaclasses_tuple,
                                     root_object_metaclass // effective czy nominal? // todo
                                 >::template object_template,
+                            x::template neighbour_effective_metaclass_template,
                             std::tuple_element_t<Is, adhoc>...
                         >
                     >{};
@@ -299,6 +341,7 @@ namespace graft
 
 
         target_graph_type target_graph;
+        // static_assert(std::is_same_v<void, target_graph_type>);
 
         std::unordered_map<void*, std::shared_ptr<void>> source_target_map;
 
@@ -331,17 +374,24 @@ namespace graft
                         using source_neighbour_type = typename std::remove_cvref_t<decltype(source_neighbour_ptr)>::element_type;
                         if (not source_target_map.contains(source_object_ptr.get()))
                         {
-                            const auto& target_object_ptr = target_graph.template create<source_object_metaclass>(); // TODO // KURWA WAŻNE, ALE NA POTEM
+                            const auto& target_object_ptr =  shallow_clone(target_graph, *source_object_ptr);
+                            // const auto& target_object_ptr = target_graph.template create<source_object_metaclass>(); // TODO // KURWA WAŻNE, ALE NA POTEM
                             source_target_map.emplace(source_object_ptr.get(), std::static_pointer_cast<void>(target_object_ptr));
                         }
                         if (not source_target_map.contains(source_neighbour_ptr.get()))
                         {
-                            const auto& target_neighbour_ptr = target_graph.template create<source_neighbour_metaclass>(); // TODO // KURWA WAŻNE, ALE NA POTEM
+
+                            const auto& target_neighbour_ptr = shallow_clone(target_graph, *source_neighbour_ptr);
+                            // jeśli to ma działać na grafie, to mogę shallow clone po prostu czy coś
+                            // const auto& target_neighbour_ptr = target_graph.template create<source_neighbour_metaclass>(); // TODO // KURWA WAŻNE, ALE NA POTEM
                             source_target_map.emplace(source_neighbour_ptr.get(), std::static_pointer_cast<void>(target_neighbour_ptr));
                         }
 
-                        using target_object_type = target_graph_type::template object_template<source_object_metaclass>;
-                        using target_neighbour_type = target_graph_type::template object_template<source_neighbour_metaclass>;
+                        using target_object_effective_metaclass = x::template neighbour_effective_metaclass_template<source_object_metaclass>;
+                        using target_neighbour_effective_metaclass = x::template neighbour_effective_metaclass_template<source_neighbour_metaclass>;
+
+                        using target_object_type = target_graph_type::template object_template<target_object_effective_metaclass, x::template neighbour_effective_metaclass_template>;
+                        using target_neighbour_type = target_graph_type::template object_template<target_neighbour_effective_metaclass, x::template neighbour_effective_metaclass_template>;
 
                         const auto& target_object_ptr = std::static_pointer_cast<target_object_type>(source_target_map.at(source_object_ptr.get()));
                         const auto& target_neighbour_ptr = std::static_pointer_cast<target_neighbour_type>(source_target_map.at(source_neighbour_ptr.get()));

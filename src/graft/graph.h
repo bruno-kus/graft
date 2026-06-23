@@ -8,6 +8,25 @@
 
 namespace graft
 {
+    template<class from_metaclass, class to_metaclass>
+    constexpr static  bool directed_edge_exists_v = []
+        {
+
+            // no tak, bo metaklasy się nie zachowują...
+            // i to jest grupby problem
+            //
+
+            // to zawsze będzie false, ponieważ
+            return tuple_contains_if_v<typename from_metaclass::members, []<class from_metaclass_member>
+                {
+                    if constexpr (not some_associator<from_metaclass_member>) { return false; }
+                    else
+                    {
+                        return from_metaclass_member::value_type::neighbour_metaclass::metaclass_name == to_metaclass::metaclass_name; // TU DUŻY ZNAK ZAPYTANIA // TODO
+                        // return std::is_same_v<typename from_metaclass_member::value_type::neighbour_metaclass, typename to_metaclass::source_metaclass>;
+                    }
+                }>;
+        }();
     template<class object_type>
     struct object_storage
     {
@@ -48,20 +67,20 @@ namespace graft
     /*
      * jeżeli mam neighbour object template oraz object_template, czy mogę być tym samym
      */
-    template<template<class> class object_template_arg, class... metaclasses>
+    template<template<class, template<class> class> class object_template_arg, template<class> class neighbour_effective_metaclass_template, class... metaclasses>
     struct graph
     {
-        template<class T>
-        using object_template = object_template_arg<T>;
+        template<class T, template<class> class>
+        using object_template = object_template_arg<T, neighbour_effective_metaclass_template>;
 
         using metaclasses_tuple = std::tuple<metaclasses...>;
 
-        std::tuple<object_storage<object_template_arg<metaclasses>>...> m_storages;
+        std::tuple<object_storage<object_template_arg<metaclasses, neighbour_effective_metaclass_template>>...> m_storages;
 
         template<class metaclass>
-        auto get_storage() -> object_storage<object_template_arg<metaclass>>&
+        auto get_storage() -> object_storage<object_template_arg<metaclass, neighbour_effective_metaclass_template>>&
         {
-            return std::get<object_storage<object_template_arg<metaclass>>>(m_storages);
+            return std::get<object_storage<object_template_arg<metaclass, neighbour_effective_metaclass_template>>>(m_storages);
         }
 
         friend std::hash<graph>;
@@ -179,7 +198,7 @@ namespace graft
         // requires (std::is_same_v<metaclass, metaclasses> || ...)
         auto create(auto&&... args)
         {
-            auto object_ptr = std::make_shared<object_template_arg<metaclass>>(std::forward<decltype(args)>(args)...);
+            auto object_ptr = std::make_shared<object_template_arg<metaclass, neighbour_effective_metaclass_template>>(std::forward<decltype(args)>(args)...);
 
             get_storage<metaclass>().store(object_ptr);
 
@@ -204,8 +223,16 @@ namespace graft
             // const auto& a_ptr = get_storage<typename A::metaclass>().find(a);
             // const auto& b_ptr = get_storage<typename B::metaclass>().find(b);
 
-            const bool a_to_b_exists = a.exists_link(b);
-            const bool b_to_a_exists = b.exists_link(a);
+            const bool a_to_b_exists = true;
+            if constexpr (directed_edge_exists_v<typename A::metaclass, typename B::metaclass>)
+            {
+                a.exists_link(b);
+            }
+            const bool b_to_a_exists = true;
+            if constexpr (directed_edge_exists_v<typename B::metaclass, typename A::metaclass>)
+            {
+                b.exists_link(a);
+            }
 
             return a_to_b_exists and b_to_a_exists;
         }
@@ -220,8 +247,15 @@ namespace graft
             // natomiast b_ptr jest już std::shared_ptr<graft::object<Album>>
             // static_assert(std::is_same_v<decltype(b_ptr), std::shared_ptr<graft::object<Album>>>);
 
-            a.insert_link(std::move(b_ptr));
-            b.insert_link(std::move(a_ptr));
+            if constexpr (directed_edge_exists_v<typename A::metaclass, typename B::metaclass>)
+            {
+                a.insert_link(std::move(b_ptr));
+            }
+            if constexpr (directed_edge_exists_v<typename B::metaclass, typename A::metaclass>)
+            {
+                b.insert_link(std::move(a_ptr));
+
+            }
         }
 
     };

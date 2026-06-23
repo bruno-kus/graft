@@ -8,6 +8,7 @@
 #include <ranges>
 #include <sstream>
 
+
 // struct old {};
 namespace graft
 {
@@ -16,24 +17,7 @@ namespace graft
     struct patch
     {
 
-        template<class from_metaclass, class to_metaclass>
-        constexpr static  bool directed_edge_exists_v = []
-            {
 
-                // no tak, bo metaklasy się nie zachowują...
-                // i to jest grupby problem
-                //
-
-                // to zawsze będzie false, ponieważ
-                return tuple_contains_if_v<typename from_metaclass::members, []<class from_metaclass_member>
-                    {
-                        if constexpr (not some_associator<from_metaclass_member>) { return false; }
-                        else
-                        {
-                            return std::is_same_v<typename from_metaclass_member::value_type::neighbour_metaclass, typename to_metaclass::source_metaclass>;
-                        }
-                    }>;
-            }();
 
 
         template<class T>
