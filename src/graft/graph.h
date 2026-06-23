@@ -12,18 +12,12 @@ namespace graft
     constexpr static  bool directed_edge_exists_v = []
         {
 
-            // no tak, bo metaklasy się nie zachowują...
-            // i to jest grupby problem
-            //
-
-            // to zawsze będzie false, ponieważ
             return tuple_contains_if_v<typename from_metaclass::members, []<class from_metaclass_member>
                 {
                     if constexpr (not some_associator<from_metaclass_member>) { return false; }
                     else
                     {
-                        return from_metaclass_member::value_type::neighbour_metaclass::metaclass_name == to_metaclass::metaclass_name; // TU DUŻY ZNAK ZAPYTANIA // TODO
-                        // return std::is_same_v<typename from_metaclass_member::value_type::neighbour_metaclass, typename to_metaclass::source_metaclass>;
+                        return from_metaclass_member::value_type::neighbour_metaclass::metaclass_name == to_metaclass::metaclass_name;
                     }
                 }>;
         }();
@@ -220,21 +214,18 @@ namespace graft
         template<class A, class B>
         auto exists_association(const A& a, const B& b)
         {
-            // const auto& a_ptr = get_storage<typename A::metaclass>().find(a);
-            // const auto& b_ptr = get_storage<typename B::metaclass>().find(b);
-
-            const bool a_to_b_exists = true;
+            bool a_to_b_exists = true;
             if constexpr (directed_edge_exists_v<typename A::metaclass, typename B::metaclass>)
             {
-                a.exists_link(b);
+                a_to_b_exists = a.exists_link(b);
             }
-            const bool b_to_a_exists = true;
+             bool b_to_a_exists = true;
             if constexpr (directed_edge_exists_v<typename B::metaclass, typename A::metaclass>)
             {
-                b.exists_link(a);
+                b_to_a_exists = b.exists_link(a);
             }
 
-            return a_to_b_exists and b_to_a_exists;
+            return a_to_b_exists or b_to_a_exists;
         }
 
         template<class A, class B>

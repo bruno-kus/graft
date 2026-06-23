@@ -5,6 +5,15 @@
 #include "test-util.h"
 
 
+
+TEST_CASE("graft::directed_edge_exists_v")
+{
+    using Graph = graft::graph<graft::object, std::type_identity_t, Artist, Album, AlbumNumberedTrack, Disc, DiscNumberedTrack, Track>;
+    Graph graph;
+
+    static_assert(graft::directed_edge_exists_v<Artist, Album>);
+    static_assert(graft::directed_edge_exists_v<Album, Artist>);
+}
 TEST_CASE("graft::graft<graft::object, ...>")
 {
     using Graph = graft::graph<graft::object, std::type_identity_t, Artist, Album, AlbumNumberedTrack, Disc, DiscNumberedTrack, Track>;

@@ -66,17 +66,92 @@ namespace graft
         }(std::make_index_sequence<std::tuple_size_v<non_associators>>());
     }
 
-    template<class root_metaclass>
-    consteval auto compute_member_blacklist_size() -> std::size_t
-    {
-        std::size_t result = 0;
+    // template<class root_metaclass>
+    // consteval auto compute_member_blacklist_size_old() -> std::size_t
+    // {
+    //     std::size_t result = 0;
 
+    //     struct association
+    //     {
+    //         constexpr association( std::string_view metaclass_name_1, std::string_view metaclass_name_2)
+    //         {
+    //             from_metaclass_name = std::min(metaclass_name_1, metaclass_name_2);
+    //             to_metaclass_name = std::max(metaclass_name_1, metaclass_name_2);
+    //         };
+
+    //         std::string_view from_metaclass_name;
+    //         std::string_view to_metaclass_name;
+
+    //         constexpr bool operator==(const association&) const  = default;
+    //     };
+    //     std::vector<association> traversed;
+
+
+    //     constexpr static auto is_edge_traversed = [](std::vector<association>& traversed, std::string_view metaclass_name_1, std::string_view metaclass_name_2)
+    //     {
+    //         const auto it = std::ranges::find(traversed, association{metaclass_name_1, metaclass_name_2});
+    //         return (it != traversed.end());
+    //     };
+
+    //     constexpr static auto add_traversed_edge = [](std::vector<association>& traversed, std::string_view metaclass_name_1, std::string_view metaclass_name_2)
+    //     {
+    //         if (not is_edge_traversed(traversed, metaclass_name_1, metaclass_name_2)) { traversed.emplace_back(association{metaclass_name_1, metaclass_name_2}); }
+    //     };
+
+    //     [&result, &traversed]<class previous_metaclass, class current_metaclass>(this auto&& visit_metaclass) -> void
+    //     {
+    //         using associators = tuple_remove_if_t
+    //         <
+    //             typename current_metaclass::members,
+    //             []<class T>{ return not some_associator<T>; }
+    //         >;
+    //         [&visit_metaclass, &result, &traversed]<std::size_t associator_index = 0>(this auto&& traverse_associator)
+    //         {
+    //             if constexpr (associator_index == std::tuple_size_v<associators>) { return; }
+    //             else
+    //             {
+    //                 using current_associator = std::tuple_element_t<associator_index, associators>;
+    //                 using neighbour_metaclass = typename current_associator::value_type::neighbour_metaclass;
+
+    //                 constexpr bool current_associator_neighbour_metaclass_same_as_previous_metaclass = std::is_same_v<typename current_associator::value_type::neighbour_metaclass, previous_metaclass>;
+    //                 constexpr bool current_associator_arity_many = requires { typename current_associator::value_type::arity_many; };
+    //                 if constexpr (current_associator_neighbour_metaclass_same_as_previous_metaclass and current_associator_arity_many)
+    //                 {
+    //                     result += 1;
+    //                 }
+
+    //                 if (not is_edge_traversed(traversed, current_metaclass::metaclass_name, neighbour_metaclass::metaclass_name))
+    //                 {
+    //                     add_traversed_edge(traversed, current_metaclass::metaclass_name, neighbour_metaclass::metaclass_name);
+    //                     visit_metaclass.template operator()<current_metaclass, typename current_associator::value_type::neighbour_metaclass>();
+    //                 }
+
+    //                 // jeżeli nie szedłem już tą krawędzią // TODO
+    //                 return traverse_associator.template operator()<associator_index + 1>();
+
+    //             }
+    //         }();
+    //     }.template operator()<void, root_metaclass>();
+    //     return result;
+    // }
+
+
+    struct member_location
+    {
+        std::size_t metaclass_index = 0;
+        std::size_t member_index = 0;
+
+        friend bool operator==(const member_location&, const member_location&) = default;
+    };
+    template<class metaclasses_tuple, class root_metaclass>
+    consteval auto compute_kept_members() -> auto
+    {
         struct association
         {
             constexpr association( std::string_view metaclass_name_1, std::string_view metaclass_name_2)
             {
-                from_metaclass_name = std::min(metaclass_name_1, metaclass_name_2);
-                to_metaclass_name = std::max(metaclass_name_1, metaclass_name_2);
+                from_metaclass_name = metaclass_name_1;
+                to_metaclass_name = metaclass_name_2;
             };
 
             std::string_view from_metaclass_name;
@@ -84,28 +159,43 @@ namespace graft
 
             constexpr bool operator==(const association&) const  = default;
         };
-        std::vector<association> traversed;
+
+        std::array< member_location, 50> kept_members;
+        std::size_t kept_members_back = 0;
+
+        std::vector<association> visited_associations;
+
+        constexpr static auto association_in_visited = [](const auto& visited_associations, const auto& association)
+            {
+                const auto it = std::ranges::find(visited_associations, association);
+                const bool found = it != visited_associations.end();
+                return found;
+            };
+        constexpr static auto add_association_to_visited = []( auto& visited_associations, const auto& association)
+            {
+                if (not association_in_visited(visited_associations, association)) { visited_associations.emplace_back(association); }
+            };
 
 
-        constexpr static auto is_edge_traversed = [](std::vector<association>& traversed, std::string_view metaclass_name_1, std::string_view metaclass_name_2)
-        {
-            const auto it = std::ranges::find(traversed, association{metaclass_name_1, metaclass_name_2});
-            return (it != traversed.end());
-        };
-
-        constexpr static auto add_traversed_edge = [](std::vector<association>& traversed, std::string_view metaclass_name_1, std::string_view metaclass_name_2)
-        {
-            if (not is_edge_traversed(traversed, metaclass_name_1, metaclass_name_2)) { traversed.emplace_back(association{metaclass_name_1, metaclass_name_2}); }
-        };
-
-        [&result, &traversed]<class previous_metaclass, class current_metaclass>(this auto&& visit_metaclass) -> void
+        [&]<class previous_metaclass, class current_metaclass>(this auto&& visit_metaclass)
         {
             using associators = tuple_remove_if_t
             <
                 typename current_metaclass::members,
-                []<class T>{ return not some_associator<T>; }
+                []<class member> { return not some_associator<member>; }
             >;
-            [&visit_metaclass, &result, &traversed]<std::size_t associator_index = 0>(this auto&& traverse_associator)
+            if constexpr (not std::is_same_v<previous_metaclass, void>)
+            {
+                const association association{previous_metaclass::metaclass_name, current_metaclass::metaclass_name};
+                if (association_in_visited(visited_associations, association))
+                {
+                    return;
+                }
+                add_association_to_visited(visited_associations, association);
+            }
+
+
+            [&]<std::size_t associator_index = 0>(this auto&& traverse_associator)
             {
                 if constexpr (associator_index == std::tuple_size_v<associators>) { return; }
                 else
@@ -113,106 +203,184 @@ namespace graft
                     using current_associator = std::tuple_element_t<associator_index, associators>;
                     using neighbour_metaclass = typename current_associator::value_type::neighbour_metaclass;
 
-                    constexpr bool current_associator_neighbour_metaclass_same_as_previous_metaclass = std::is_same_v<typename current_associator::value_type::neighbour_metaclass, previous_metaclass>;
+                    constexpr bool is_reverse_of_current_step = std::is_same_v<neighbour_metaclass, previous_metaclass>;
                     constexpr bool current_associator_arity_many = requires { typename current_associator::value_type::arity_many; };
-                    if constexpr (current_associator_neighbour_metaclass_same_as_previous_metaclass and current_associator_arity_many)
+
+                    if constexpr (is_reverse_of_current_step and current_associator_arity_many)
                     {
-                        result += 1;
+                        return traverse_associator.template operator()<associator_index + 1>();
                     }
 
-                    if (not is_edge_traversed(traversed, current_metaclass::metaclass_name, neighbour_metaclass::metaclass_name))
-                    {
-                        add_traversed_edge(traversed, current_metaclass::metaclass_name, neighbour_metaclass::metaclass_name);
-                        visit_metaclass.template operator()<current_metaclass, typename current_associator::value_type::neighbour_metaclass>();
-                    }
-
-                    // jeżeli nie szedłem już tą krawędzią // TODO
-                    return traverse_associator.template operator()<associator_index + 1>();
-
+                    kept_members.at(kept_members_back++) = member_location
+                        {
+                            .metaclass_index = tuple_find_v<metaclasses_tuple, current_metaclass>,
+                            .member_index=tuple_find_v<typename current_metaclass::members, current_associator>
+                        };
+                    visit_metaclass.template operator()<current_metaclass, neighbour_metaclass>();
+                    traverse_associator.template operator()<associator_index + 1>();
                 }
             }();
         }.template operator()<void, root_metaclass>();
+        return kept_members;
+    }
+
+
+    template<class metaclasses_tuple, class root_metaclass>
+    consteval auto compute_member_blacklist_size() -> std::size_t
+    {
+        constexpr auto kept_members = compute_kept_members<metaclasses_tuple, root_metaclass>();
+        std::size_t result = 0;
+
+        constexpr static auto kept_members_contains_member_location = [](const auto& kept_members, const auto& member_location)
+            {
+                const auto it = std::ranges::find(kept_members, member_location);
+                const bool found = it != kept_members.end();
+                return found;
+            };
+
+        [&]<std::size_t metaclass_index = 0>(this auto&& traverse_metaclass)
+        {
+            if constexpr (metaclass_index == std::tuple_size_v<metaclasses_tuple>) { return; }
+            else
+            {
+                using current_metaclass = std::tuple_element_t<metaclass_index, metaclasses_tuple>;
+                using associators = tuple_remove_if_t
+                <
+                    typename current_metaclass::members,
+                    []<class member> { return not some_associator<member>; }
+                >;
+                [&]<std::size_t associator_index = 0>(this auto&& traverse_associator)
+                {
+                    if constexpr (associator_index == std::tuple_size_v<associators>) { return; }
+                    else
+                    {
+                        using current_associator = std::tuple_element_t<associator_index, associators>;
+                        const auto current_member_location = member_location
+                            {
+                                .metaclass_index = tuple_find_v<metaclasses_tuple, current_metaclass>,
+                                .member_index=tuple_find_v<typename current_metaclass::members, current_associator>
+                            };
+
+                        if (not kept_members_contains_member_location(kept_members, current_member_location))
+                        {
+                            ++result;
+                        }
+                        return traverse_associator.template operator()<associator_index + 1>();
+                    }
+                }();
+                return traverse_metaclass. template operator()<metaclass_index + 1>();
+            }
+        }();
         return result;
     }
 
     template<class metaclasses_tuple, class root_metaclass>
     consteval auto compute_member_blacklist() -> auto
     {
-        constexpr static auto member_blacklist_size = compute_member_blacklist_size<root_metaclass>();
+        constexpr auto member_blacklist_size = compute_member_blacklist_size<metaclasses_tuple, root_metaclass>();
 
-
-        struct member_location
-        {
-            std::size_t metaclass_index = 0;
-            std::size_t member_index = 0;
-        };
-
-
-        struct association
-        {
-            constexpr association( std::string_view metaclass_name_1, std::string_view metaclass_name_2)
-            {
-                from_metaclass_name = std::min(metaclass_name_1, metaclass_name_2);
-                to_metaclass_name = std::max(metaclass_name_1, metaclass_name_2);
-            };
-
-            std::string_view from_metaclass_name;
-            std::string_view to_metaclass_name;
-
-            constexpr bool operator==(const association&) const  = default;
-        };
-        std::vector<association> traversed;
-
-
-        constexpr static auto is_edge_traversed = [](std::vector<association>& traversed, std::string_view metaclass_name_1, std::string_view metaclass_name_2)
-        {
-            const auto it = std::ranges::find(traversed, association{metaclass_name_1, metaclass_name_2});
-            const bool found = (it != traversed.end());
-            return found;
-        };
-
-        constexpr static auto add_traversed_edge = [](std::vector<association>& traversed, std::string_view metaclass_name_1, std::string_view metaclass_name_2)
-        {
-            if (not is_edge_traversed(traversed, metaclass_name_1, metaclass_name_2)) { traversed.emplace_back(association{metaclass_name_1, metaclass_name_2}); }
-        };
-
-
+        constexpr auto kept_members = compute_kept_members<metaclasses_tuple, root_metaclass>();
         std::array<member_location, member_blacklist_size> result;
         std::size_t result_back = 0;
-        [&result, & result_back, &traversed ]<class previous_metaclass, class current_metaclass>(this auto&& visit_metaclass) -> void
-        {
-            using associators = tuple_remove_if_t
-            <
-                typename current_metaclass::members,
-                []<class T>{ return not some_associator<T>; }
-            >;
-            [&visit_metaclass, &result, &result_back, &traversed]<std::size_t associator_index = 0>(this auto&& traverse_associator)
-            {
-                if constexpr (associator_index == std::tuple_size_v<associators>) { return; }
-                else
-                {
-                    using current_associator = std::tuple_element_t<associator_index, associators>;
-                    using neighbour_metaclass = typename current_associator::value_type::neighbour_metaclass;
 
-                    constexpr bool current_associator_neighbour_metaclass_same_as_previous_metaclass = std::is_same_v<typename current_associator::value_type::neighbour_metaclass, previous_metaclass>;
-                    constexpr bool current_associator_arity_many = requires { typename current_associator::value_type::arity_many; };
-                    if constexpr (current_associator_neighbour_metaclass_same_as_previous_metaclass and current_associator_arity_many)
+        constexpr static auto kept_members_contains_member_location = [](const auto& kept_members, const auto& member_location)
+            {
+                const auto it = std::ranges::find(kept_members, member_location);
+                const bool found = it != kept_members.end();
+                return found;
+            };
+
+        [&]<std::size_t metaclass_index = 0>(this auto&& traverse_metaclass)
+        {
+            if constexpr (metaclass_index == std::tuple_size_v<metaclasses_tuple>) { return; }
+            else
+            {
+                using current_metaclass = std::tuple_element_t<metaclass_index, metaclasses_tuple>;
+                using associators = tuple_remove_if_t
+                <
+                    typename current_metaclass::members,
+                    []<class member> { return not some_associator<member>; }
+                >;
+                [&]<std::size_t associator_index = 0>(this auto&& traverse_associator)
+                {
+                    if constexpr (associator_index == std::tuple_size_v<associators>) { return; }
+                    else
                     {
-                        result.at(result_back) = member_location{.metaclass_index = tuple_find_v<metaclasses_tuple, current_metaclass>, .member_index=tuple_find_v<typename current_metaclass::members, current_associator> };
-                        ++result_back;
+                        using current_associator = std::tuple_element_t<associator_index, associators>;
+                        const auto current_member_location = member_location
+                            {
+                                .metaclass_index = tuple_find_v<metaclasses_tuple, current_metaclass>,
+                                .member_index=tuple_find_v<typename current_metaclass::members, current_associator>
+                            };
+
+                        if (not kept_members_contains_member_location(kept_members, current_member_location))
+                        {
+                            result.at(result_back++) = current_member_location;
+                        }
                         return traverse_associator.template operator()<associator_index + 1>();
                     }
+                }();
+                return traverse_metaclass. template operator()<metaclass_index + 1>();
+            }
+        }();
 
-                    if (not is_edge_traversed(traversed, current_metaclass::metaclass_name, neighbour_metaclass::metaclass_name))
-                    {
-                        add_traversed_edge(traversed, current_metaclass::metaclass_name, neighbour_metaclass::metaclass_name);
-                        visit_metaclass.template operator()<current_metaclass, typename current_associator::value_type::neighbour_metaclass>();
-                    }
-                    return traverse_associator.template operator()<associator_index + 1>();
+        return result;
 
-                };
-            }();
-        }.template operator()<void, root_metaclass>();
+        // iteruję teraz po wszystkich asocjactorach i odejmuję od nich
+
+
+        // std::vector<association> traversed;
+
+
+        // constexpr static auto is_edge_traversed = [](std::vector<association>& traversed, std::string_view metaclass_name_1, std::string_view metaclass_name_2)
+        // {
+        //     const auto it = std::ranges::find(traversed, association{metaclass_name_1, metaclass_name_2});
+        //     const bool found = (it != traversed.end());
+        //     return found;
+        // };
+
+        // constexpr static auto add_traversed_edge = [](std::vector<association>& traversed, std::string_view metaclass_name_1, std::string_view metaclass_name_2)
+        // {
+        //     if (not is_edge_traversed(traversed, metaclass_name_1, metaclass_name_2)) { traversed.emplace_back(association{metaclass_name_1, metaclass_name_2}); }
+        // };
+
+
+        // std::array<member_location, member_blacklist_size> result;
+        // std::size_t result_back = 0;
+        // [&result, & result_back, &traversed ]<class previous_metaclass, class current_metaclass>(this auto&& visit_metaclass) -> void
+        // {
+        //     using associators = tuple_remove_if_t
+        //     <
+        //         typename current_metaclass::members,
+        //         []<class T>{ return not some_associator<T>; }
+        //     >;
+        //     [&visit_metaclass, &result, &result_back, &traversed]<std::size_t associator_index = 0>(this auto&& traverse_associator)
+        //     {
+        //         if constexpr (associator_index == std::tuple_size_v<associators>) { return; }
+        //         else
+        //         {
+        //             using current_associator = std::tuple_element_t<associator_index, associators>;
+        //             using neighbour_metaclass = typename current_associator::value_type::neighbour_metaclass;
+
+        //             constexpr bool current_associator_neighbour_metaclass_same_as_previous_metaclass = std::is_same_v<typename current_associator::value_type::neighbour_metaclass, previous_metaclass>;
+        //             constexpr bool current_associator_arity_many = requires { typename current_associator::value_type::arity_many; };
+        //             if constexpr (current_associator_neighbour_metaclass_same_as_previous_metaclass and current_associator_arity_many)
+        //             {
+        //                 result.at(result_back) = member_location{.metaclass_index = tuple_find_v<metaclasses_tuple, current_metaclass>, .member_index=tuple_find_v<typename current_metaclass::members, current_associator> };
+        //                 ++result_back;
+        //                 return traverse_associator.template operator()<associator_index + 1>();
+        //             }
+
+        //             if (not is_edge_traversed(traversed, current_metaclass::metaclass_name, neighbour_metaclass::metaclass_name))
+        //             {
+        //                 add_traversed_edge(traversed, current_metaclass::metaclass_name, neighbour_metaclass::metaclass_name);
+        //                 visit_metaclass.template operator()<current_metaclass, typename current_associator::value_type::neighbour_metaclass>();
+        //             }
+        //             return traverse_associator.template operator()<associator_index + 1>();
+
+        //         };
+        //     }();
+        // }.template operator()<void, root_metaclass>();
         return result;
     }
 
@@ -318,7 +486,7 @@ namespace graft
             <
                 object_template,
                 typename source_graph_type::metaclasses_tuple,
-                root_object_metaclass // effective czy nominal? // todo
+                root_object_metaclass
             >;
 
         using target_graph_type = decltype
@@ -331,7 +499,7 @@ namespace graft
                                 <
                                     object_template,
                                     typename source_graph_type::metaclasses_tuple,
-                                    root_object_metaclass // effective czy nominal? // todo
+                                    root_object_metaclass
                                 >::template object_template,
                             x::template neighbour_effective_metaclass_template,
                             std::tuple_element_t<Is, adhoc>...
@@ -341,14 +509,13 @@ namespace graft
 
 
         target_graph_type target_graph;
-        // static_assert(std::is_same_v<void, target_graph_type>);
 
         std::unordered_map<void*, std::shared_ptr<void>> source_target_map;
 
         [&source_graph, &target_graph, &source_target_map]<class previous_metaclass>(this auto&& self, const auto& source_object_ptr) ->void
         {
             using source_object_metaclass = std::remove_cvref_t<decltype(source_object_ptr)>::element_type::metaclass;
-            using source_object_type = std::remove_cvref_t<decltype(source_object_ptr)>::element_type; // object<Album>
+            using source_object_type = std::remove_cvref_t<decltype(source_object_ptr)>::element_type;
             using associators = tuple_remove_if_t
             <
                 typename source_object_metaclass::members,
@@ -375,15 +542,12 @@ namespace graft
                         if (not source_target_map.contains(source_object_ptr.get()))
                         {
                             const auto& target_object_ptr =  shallow_clone(target_graph, *source_object_ptr);
-                            // const auto& target_object_ptr = target_graph.template create<source_object_metaclass>(); // TODO // KURWA WAŻNE, ALE NA POTEM
                             source_target_map.emplace(source_object_ptr.get(), std::static_pointer_cast<void>(target_object_ptr));
                         }
                         if (not source_target_map.contains(source_neighbour_ptr.get()))
                         {
 
                             const auto& target_neighbour_ptr = shallow_clone(target_graph, *source_neighbour_ptr);
-                            // jeśli to ma działać na grafie, to mogę shallow clone po prostu czy coś
-                            // const auto& target_neighbour_ptr = target_graph.template create<source_neighbour_metaclass>(); // TODO // KURWA WAŻNE, ALE NA POTEM
                             source_target_map.emplace(source_neighbour_ptr.get(), std::static_pointer_cast<void>(target_neighbour_ptr));
                         }
 
