@@ -146,7 +146,7 @@ namespace graft
         }
 
         template<class member>
-        requires (tuple_contains_v<typename metaclass::members, const member>)
+        // requires (tuple_contains_v<typename metaclass::members, const member>)
         auto get(this auto&& self, member) -> decltype(auto)
         {
             constexpr auto member_index = get_member_index<member>();
@@ -154,7 +154,7 @@ namespace graft
         }
 
         template<class member>
-        requires (tuple_contains_v<typename metaclass::members, const member>) and (not some_associator<std::remove_cvref_t<member>>)
+        requires (tuple_contains_v<typename metaclass::members, const member> or tuple_contains_v<typename metaclass::members, member>) and (not some_associator<std::remove_cvref_t<member>>)
         auto set(member, auto value) -> void
         {
             constexpr auto member_index = get_member_index<member>();

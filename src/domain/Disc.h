@@ -6,6 +6,10 @@ struct Album;
 
 struct Disc
 {
+
+    using nominal_metaclass = Disc;
+
+
     constexpr static auto metaclass_name = "Disc"sv;
 
     constexpr static auto number = graft::member<"number", std::size_t>;

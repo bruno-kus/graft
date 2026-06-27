@@ -6,6 +6,8 @@ struct Album;
 
 struct Artist
 {
+    using nominal_metaclass = Artist;
+
     constexpr static auto metaclass_name = "Artist"sv;
 
     constexpr static auto name = graft::member<"name", std::string, graft::visibility::k_public>;

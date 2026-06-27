@@ -7,6 +7,8 @@ struct Disc;
 
 struct Album
 {
+    using nominal_metaclass = Album;
+
     constexpr static auto metaclass_name = "Album"sv;
 
     constexpr static auto title = graft::member<"title", std::string>;

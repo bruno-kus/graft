@@ -19,6 +19,8 @@ namespace graft
 
         public:
         using base::base;
+        using base::get;
+        using base::set;
 
         // template<class p_metaclass>
         // using neighbour_template = object<p_metaclass, neighbour_effective_metaclass_template>;

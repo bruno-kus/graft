@@ -7,6 +7,8 @@ struct Track;
 struct DiscNumberedTrack
 {
 
+    using nominal_metaclass = DiscNumberedTrack;
+
     constexpr static auto metaclass_name = "DiscNumberedTrack"sv;
 
     constexpr static auto number = graft::member<"number", std::size_t>;

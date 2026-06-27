@@ -48,3 +48,23 @@ TEST_CASE("graft::graft<graft::object, ...>")
     addDiscNumberedTrack(graph, *disc2Ptr,  *track2_2Ptr, 2);
 
 }
+
+
+// template<template<class, template<class> class> class, template<class> class, class...> class graph_template, template<class, template<class>> class object_template_arg, template<class> class >
+// template
+// <
+//     template<class, template<class>> class object_template_arg,
+//     template<class> class effective_metaclass_template,
+//     class... metaclasses
+// >
+
+// i teraz to mogę podawać jako source graph type, ale...
+/*
+ * problem nadal leży w tym, że te ograniczniea tutaj zaimplementowane
+ * nie będą się odnosiły do tego nowo utworzonego grafu
+ * ale to ma sens, ponieważ te
+ */
+
+/*
+ * TODO:
+ */

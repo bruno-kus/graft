@@ -64,12 +64,20 @@ namespace graft
     template<template<class, template<class> class> class object_template_arg, template<class> class neighbour_effective_metaclass_template, class... metaclasses>
     struct graph
     {
-        template<class T, template<class> class>
-        using object_template = object_template_arg<T, neighbour_effective_metaclass_template>;
+
+        template<class T>
+        using object_for_metaclass = object_template_arg<T, neighbour_effective_metaclass_template>;
+
+        template<class T, template<class> class neif>
+        using object_template = object_template_arg<T, neif>;
 
         using metaclasses_tuple = std::tuple<metaclasses...>;
+        template<class T>
+        using effective_metaclass_template = neighbour_effective_metaclass_template<T>;
 
         std::tuple<object_storage<object_template_arg<metaclasses, neighbour_effective_metaclass_template>>...> m_storages;
+
+        using object_types = std::tuple<object_template_arg<metaclasses, neighbour_effective_metaclass_template>...>;
 
         template<class metaclass>
         auto get_storage() -> object_storage<object_template_arg<metaclass, neighbour_effective_metaclass_template>>&
@@ -79,6 +87,7 @@ namespace graft
 
         friend std::hash<graph>;
 
+        friend auto compare_graphs(const auto&, const auto&) -> bool;
         friend auto operator==(const graph& graph1, const graph& graph2) -> bool
         {
             const auto make_tie_of_non_associators = [](const auto& object) -> auto
@@ -248,8 +257,91 @@ namespace graft
 
             }
         }
-
     };
+
+    // auto compare_graphs(const auto& graph1, const auto& graph2) -> bool
+    // {
+    //     const auto make_tie_of_non_associators = [](const auto& object) -> auto
+    //     {
+    //         using object_metaclass = typename std::remove_cvref_t<decltype(object)>::metaclass;
+    //         using non_associators = tuple_remove_if_t
+    //         <
+    //             typename object_metaclass::members,
+    //             []<class T> { return some_associator<T>; }
+    //         >;
+    //         return [&object]<std::size_t... non_associator_indices>(std::index_sequence<non_associator_indices...>)
+    //         {
+    //             return std::tie(object.get(std::tuple_element_t<non_associator_indices, non_associators>{})...);
+    //         }(std::make_index_sequence<std::tuple_size_v<non_associators>>());
+    //     };
+
+    //     const bool result = [&graph1, &graph2, &make_tie_of_non_associators]<std::size_t metaclass_index = 0>(this auto&& self)
+    //     {
+    //         if constexpr (metaclass_index == sizeof...(metaclasses)) { return true; }
+    //         else
+    //         {
+    //             const auto& object_storage_1 = std::get<metaclass_index>(graph1.m_storages);
+    //             const auto& object_storage_2 = std::get<metaclass_index>(graph2.m_storages);
+
+    //             const auto check_storage = [&make_tie_of_non_associators](const auto& object_storage_1, const auto& object_storage_2) -> bool
+    //             {
+    //                 for (const auto& object_ptr_1 : object_storage_1.m_objects)
+    //                 {
+    //                     const auto& it = std::ranges::find
+    //                     (
+    //                         object_storage_2.m_objects,
+    //                         make_tie_of_non_associators(*object_ptr_1),
+    //                         [&make_tie_of_non_associators](const auto& object_ptr) { return make_tie_of_non_associators(*object_ptr); }
+    //                     );
+    //                     if (it == object_storage_2.m_objects.end()) { return false; }
+
+    //                     using object_1_metaclass = typename std::remove_cvref_t<decltype(*object_ptr_1)>::metaclass;
+    //                     using associators = tuple_remove_if_t
+    //                     <
+    //                         typename object_1_metaclass::members,
+    //                         []<class T> { return not some_associator<T>; }
+    //                     >;
+
+    //                     const auto& object_ptr_2 = *it;
+
+    //                     const bool same_neighbours =
+    //                         [&object_1 = *object_ptr_1, &object_2 = *object_ptr_2, &make_tie_of_non_associators]
+    //                         <std::size_t associator_index =0>(this auto&& self)
+    //                         {
+    //                             if constexpr (associator_index == std::tuple_size_v<associators>) { return true; }
+    //                             else
+    //                             {
+    //                                 using current_associator = std::tuple_element_t<associator_index, associators>;
+
+    //                                 const bool object_1_neighbours_empty = object_1.get(current_associator{}).empty();
+    //                                 const bool object_2_neighbours_empty = object_2.get(current_associator{}).empty();
+    //                                 if (object_1_neighbours_empty != object_2_neighbours_empty) { return false; }
+    //                                 if
+    //                                 (
+    //                                     make_tie_of_non_associators(object_1) !=
+    //                                     make_tie_of_non_associators(object_2)
+    //                                 )
+    //                                 {
+    //                                     return false;
+    //                                 }
+
+    //                                 return self.template operator()<associator_index +1>();
+    //                             }
+    //                         }();
+    //                     if (not same_neighbours) { return false; }
+    //                 }
+    //                 return true;
+    //             };
+
+    //             if (not check_storage(object_storage_1, object_storage_2)) { return false; }
+    //             if (not check_storage(object_storage_2, object_storage_1)) { return false; }
+
+    //             return self.template operator()<metaclass_index + 1>();
+    //         }
+    //     }();
+
+    //     return result;
+    // }
 }
 // template<class... metaclasses>
 // struct std::hash<graft::object<metaclasses...>>

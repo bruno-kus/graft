@@ -3,6 +3,7 @@
 #include "../src/graft/reachable_acyclic.h"
 #include "../src/graft/graph.h"
 #include "../src/graft/object.h"
+#include "../src/graft/erased_mono_cached_presenter.h"
 
 #include "test-util.h"
 #include <iostream>
@@ -65,7 +66,10 @@ TEST_CASE("graft::make_reachable_acyclic_copy | graft::patch")
     addDiscNumberedTrack(graph, *disc2Ptr,  *track2_2Ptr, 2);
 
 
-    // auto make_reachable_acyclic_copy<graft::gr
+    auto mono_cached_graph = make_reachable_acyclic_copy<graft::graph, graft::erased_mono_cached_presenter>(graph, album1Ptr);
+
+    std::cout << "mono_cached_graph:" << '\n';
+    std::cout << mono_cached_graph << '\n';
 }
 
 

@@ -8,6 +8,9 @@ struct Album;
 
 struct AlbumNumberedTrack
 {
+
+    using nominal_metaclass = AlbumNumberedTrack;
+
     constexpr static auto metaclass_name = "AlbumNumberedTrack"sv;
 
     constexpr static auto number = graft::member<"number", std::size_t>;
